@@ -1,4 +1,5 @@
-package actors;
+// src/main/java/com/djroom/app/actors/Message.java
+package com.djroom.app.actors;
 
 import java.util.Objects;
 import java.util.UUID;
@@ -7,9 +8,9 @@ public final class Message {
     private final String type;
     private final Object payload;
     private final String correlationId;
-    private final String sender;
+    private final String sender; // optionnel (nom ou null)
 
-    public Message(String type, Objects payload,String correlationId,String sender ) {
+    public Message(String type, Object payload, String correlationId, String sender) {
         this.type = Objects.requireNonNull(type);
         this.payload = payload;
         this.correlationId = (correlationId == null || correlationId.isBlank())
@@ -17,12 +18,13 @@ public final class Message {
                 : correlationId;
         this.sender = sender;
     }
+
     public String type() { return type; }
     public Object payload() { return payload; }
     public String correlationId() { return correlationId; }
     public String sender() { return sender; }
 
-    public static Message of(String type, Objects payload) {
+    public static Message of(String type, Object payload) {
         return new Message(type, payload, null, null);
     }
 }
