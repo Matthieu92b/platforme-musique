@@ -17,6 +17,9 @@ import com.djactor.models.PlayerStateManager;
 public class PlayerService {
     private Map<Integer, PlayerStateManager> playerStates = new HashMap<>();
 
+    public PlayerService() { // default constructor because spring sucks
+    }
+
     public PlayerService(int roomID) {
         playerStates.put(roomID, new PlayerStateManager());
     }
@@ -44,7 +47,7 @@ public class PlayerService {
     /**
      * @return the manager for the given id, null if none existed
      */
-    public synchronized PlayerStateManager removePlayerState(int roomID) {
+    public synchronized PlayerStateManager deletePlayerState(int roomID) {
         return playerStates.remove(roomID);
     }
 

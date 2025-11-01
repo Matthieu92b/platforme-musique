@@ -50,10 +50,10 @@ public class PlayerStateManager {
      * Toggles between PLAYING and PAUSED states
      * if STOPPED, does nothing
      */
-    public synchronized void togglePlayPause() {
+    public synchronized void togglePlayPause() { // TODO check if theres a song
         if (this.status == PlayerStatus.PLAYING)
             this.status = PlayerStatus.PAUSED;
-        else if (this.status == PlayerStatus.PAUSED)
+        else
             this.status = PlayerStatus.PLAYING;
     }
 
