@@ -24,5 +24,7 @@
     <modules>
         <module>services/djroom</module>
         <module>services/djactor</module>
+        <module>services/playistactor</module>
+
     </modules>
 </project>
