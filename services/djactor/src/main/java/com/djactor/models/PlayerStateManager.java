@@ -1,7 +1,5 @@
 package com.djactor.models;
 
-import java.time.Instant;
-
 /**
  * Represents the state of a media player and contains data about the current
  * song being played. also manages skip/prev/pause actions
@@ -10,8 +8,7 @@ import java.time.Instant;
 public class PlayerStateManager {
     private PlayerStatus status; // status of the player - enum
     private int currentTrackID;
-    private Instant startedAt; // timestamp when started playing the current song
-    private long positionMs; // current position in milliseconds in the current song
+    private long positionMs; // current position in milliseconds in the current song- synced with front
     // TODO : playlist/music variables to add
 
     // constructor that sets the state manager to a default status
@@ -28,7 +25,7 @@ public class PlayerStateManager {
     /**
      * performs actions to move to the next song in the playlist
      */
-    public void nextSong(boolean test) {
+    public synchronized void nextSong(boolean test) {
         if (test) // if next song in play list or no playlist
             startNewSong(0); // TODO : add next song in playlist
         else {
@@ -39,11 +36,11 @@ public class PlayerStateManager {
     /**
      * performs actions to move to the prev song
      */
-    public void prevSong(boolean test) {
-        if (test && getPositionMs() < 3000) // if no prev song in play list and if at the beginning of the song (<3s)
+    public synchronized void prevSong(boolean test) {
+        if (test || getPositionMs() < 3000) // if no prev song in play list or if at the beginning of the song (<3s)
             setPositionMs(0);
         else if (test) {
-            startNewSong(0); // TODO : add prev playlist
+            startNewSong(0); // TODO : play prev in playlist
         } else {
             setIdle();
         }
@@ -53,7 +50,7 @@ public class PlayerStateManager {
      * Toggles between PLAYING and PAUSED states
      * if STOPPED, does nothing
      */
-    public void togglePlayPause() {
+    public synchronized void togglePlayPause() {
         if (this.status == PlayerStatus.PLAYING)
             this.status = PlayerStatus.PAUSED;
         else if (this.status == PlayerStatus.PAUSED)
@@ -65,13 +62,26 @@ public class PlayerStateManager {
      * 
      * @param trackID ID of the track to play
      */
-    public void startNewSong(int trackID) {
+    public synchronized void startNewSong(int trackID) {
         setCurrentTrackID(trackID);
         this.status = PlayerStatus.PLAYING;
-        this.startedAt = Instant.now();
         this.positionMs = 0;
     }
 
+    /**
+     * increments the position by 250ms
+     * called by a scheduler every 250ms when playing
+     */
+    public void incrementPosition() {
+        if (this.status == PlayerStatus.PLAYING) {
+            this.positionMs += 250;
+        }
+        // TODO : if (positionMs >= trackDuration){ nextSong();}
+    }
+
+    /**
+     * sets the player to idle (default) state
+     */
     public void setIdle() {
         this.status = PlayerStatus.STOPPED;
         this.currentTrackID = 0;
@@ -102,22 +112,12 @@ public class PlayerStateManager {
         this.currentTrackID = currentTrackId;
     }
 
-    public Instant getStartedAt() {
-        return startedAt;
-    }
-
-    public void setStartedAt(Instant startedAt) {
-        this.startedAt = startedAt;
-    }
-
     public long getPositionMs() {
         return positionMs;
     }
 
     /**
      * sets the position in milliseconds, zero if negative
-     * 
-     * @param positionMs
      */
     public void setPositionMs(long positionMs) {
         if (positionMs < 0) {
