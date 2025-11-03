@@ -29,11 +29,11 @@ public class PlayerStateListener {
 
     @RabbitListener(queues = "next-song")
     public void handleNextTrack(int roomID) {
-        playerService.getPlayerState(roomID).nextSong(false);
+        playerService.getPlayerState(roomID).nextSong();
     }
 
     @RabbitListener(queues = "prev-song")
     public void handlePreviousTrack(int roomID) {
-        playerService.getPlayerState(roomID).prevSong(false);
+        playerService.getPlayerState(roomID).beginningOfSong();
     }
 }
