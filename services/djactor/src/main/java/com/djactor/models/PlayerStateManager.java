@@ -10,7 +10,7 @@ import java.util.Optional;
  */
 public class PlayerStateManager {
     private PlayerStatus status; // status of the player - enum
-    private long currentTrackID;
+    private Track currentTrack;
     private long positionMs; // current position in milliseconds in the current song- synced with front
     private final PlaylistActorLogic playlist;
 
@@ -31,9 +31,10 @@ public class PlayerStateManager {
      */
     public synchronized void nextSong() {
         Optional<Track> nextTrack = playlist.onNextTrack(new PlaylistActorLogic.NextTrack(true));
-        if (!playlist.getState().isEmpty()) { // set idle if empty
+
+        if (nextTrack.isPresent()) {
             Track track = nextTrack.get();
-            startNewSong(track.getId());
+            startNewSong(track);
         } else {
             setIdle();
         }
@@ -45,7 +46,7 @@ public class PlayerStateManager {
      * prev button
      */
     public synchronized void beginningOfSong() {
-        if (currentTrackID == 0) {
+        if (this.getCurrentTrack().equals(Track.EMPTY_TRACK)) {
             return;
         }
         setPositionMs(0);
@@ -56,7 +57,8 @@ public class PlayerStateManager {
      * if STOPPED, does nothing
      */
     public synchronized PlayerStatus togglePlayPause() {
-        if (this.getCurrentTrackID() == 0) {
+        if (this.getCurrentTrack().equals(Track.EMPTY_TRACK)) {
+            return this.status;
         }
         if (this.status == PlayerStatus.PLAYING) {
             this.status = PlayerStatus.PAUSED;
@@ -72,11 +74,11 @@ public class PlayerStateManager {
      * @param trackID ID of the track to play
      * @throws IllegalArgumentException if trackID is zero
      */
-    public synchronized void startNewSong(long trackID) {
-        if (trackID == 0) {
+    public synchronized void startNewSong(Track track) {
+        if (track.equals(Track.EMPTY_TRACK)) {
             throw new IllegalArgumentException("Track ID cannot be zero");
         }
-        setCurrentTrackID(trackID);
+        setCurrentTrack(track);
         this.status = PlayerStatus.PLAYING;
         this.positionMs = 0;
     }
@@ -86,12 +88,10 @@ public class PlayerStateManager {
      * called by a scheduler every 250ms when playing
      */
     public void incrementPosition() {
-        if (this.status == PlayerStatus.PLAYING && this.currentTrackID != 0) {
+        if (this.status == PlayerStatus.PLAYING && !this.currentTrack.equals(Track.EMPTY_TRACK)) {
             this.positionMs += 250;
 
             Track currentTrack = getCurrentTrack();
-            System.out.println(
-                    currentTrackID + " - " + positionMs + " || " + playlist.getState() + playlist.getState().isEmpty());
             if (currentTrack != null && positionMs >= currentTrack.getDurationMs()) {
                 nextSong();
             }
@@ -104,7 +104,7 @@ public class PlayerStateManager {
     public void setIdle() {
         playlist.clearTracks();
         this.status = PlayerStatus.STOPPED;
-        this.currentTrackID = 0;
+        this.currentTrack = Track.EMPTY_TRACK;
         this.positionMs = 0;
     }
 
@@ -113,9 +113,11 @@ public class PlayerStateManager {
      */
     public void addSongToPlaylist(long id, String title, String url, int score, long durationMs, Instant addedAt) {
         boolean wasEmpty = playlist.getState().isEmpty();
-        playlist.onAddTrack(new PlaylistActorLogic.AddTrack(new Track(id, title, url, score, durationMs, addedAt)));
-        if (wasEmpty) {
-            startNewSong(id); // start playing the new song if the playlist was empty
+        Track track = new Track(id, title, url, score, durationMs, addedAt);
+        playlist.onAddTrack(new PlaylistActorLogic.AddTrack(track));
+
+        if (wasEmpty && this.currentTrack.equals(Track.EMPTY_TRACK)) {
+            nextSong(); // start playing the new song if the playlist was empty and the current song too
         }
     }
 
@@ -129,30 +131,18 @@ public class PlayerStateManager {
         this.status = status;
     }
 
-    public long getCurrentTrackID() {
-        return currentTrackID;
-    }
-
-    /**
-     * gets the current track being played.
-     *
-     * @return the current track, or null if no track is playing
-     */
     public Track getCurrentTrack() {
-        return playlist.getState().stream()
-                .filter(track -> track.getId() == currentTrackID)
-                .findFirst()
-                .orElse(null);
+        return this.currentTrack;
     }
 
     /**
      * @throws IllegalArgumentException if currentTrackId is negative
      */
-    public void setCurrentTrackID(long currentTrackId) {
-        if (currentTrackId < 0) {
-            throw new IllegalArgumentException("Track ID cannot be negative");
+    public void setCurrentTrack(Track currentTrack) {
+        if (currentTrack.getId() < 0) {
+            throw new IllegalArgumentException("Track ID cannot be zero or negative");
         }
-        this.currentTrackID = currentTrackId;
+        this.currentTrack = currentTrack;
     }
 
     public long getPositionMs() {
