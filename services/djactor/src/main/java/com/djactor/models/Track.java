@@ -54,6 +54,17 @@ public final class Track {
     public static final Comparator<Track> BY_SCORE_DESC_THEN_FIFO = Comparator.comparingInt(Track::getScore).reversed()
             .thenComparing(Track::getAddedAt);
 
+    /**
+     * default empty track instance
+     */
+    public static final Track EMPTY_TRACK = new Track(
+            0,
+            "No Track",
+            "",
+            0,
+            0,
+            Instant.EPOCH);
+
     @Override
     public boolean equals(Object o) {
         if (this == o)
