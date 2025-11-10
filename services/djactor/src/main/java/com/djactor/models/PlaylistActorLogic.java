@@ -1,6 +1,4 @@
-package com.playistactor.playlist;
-
-import com.playistactor.models.Track;
+package com.djactor.models;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -13,18 +11,28 @@ public class PlaylistActorLogic {
 
     public static final class AddTrack {
         public final Track track;
-        public AddTrack(Track track) { this.track = track; }
+
+        public AddTrack(Track track) {
+            this.track = track;
+        }
     }
 
     public static final class VoteTrack {
         public final long trackId;
         public final int delta;
-        public VoteTrack(long trackId, int delta) { this.trackId = trackId; this.delta = delta; }
+
+        public VoteTrack(long trackId, int delta) {
+            this.trackId = trackId;
+            this.delta = delta;
+        }
     }
 
     public static final class NextTrack {
         public final boolean isNext;
-        public NextTrack(boolean isNext) { this.isNext = isNext; }
+
+        public NextTrack(boolean isNext) {
+            this.isNext = isNext;
+        }
     }
 
     public synchronized void onAddTrack(AddTrack msg) {
@@ -32,22 +40,32 @@ public class PlaylistActorLogic {
         sortPlaylist();
     }
 
+    public synchronized void clearTracks() {
+        tracks.clear();
+    }
+
     public synchronized boolean onVoteTrack(VoteTrack msg) {
         Optional<Track> opt = tracks.stream().filter(t -> t.getId() == msg.trackId).findFirst();
-        if (opt.isEmpty()) return false;
+        if (opt.isEmpty())
+            return false;
         opt.get().addScore(msg.delta);
         sortPlaylist();
         return true;
     }
 
     public synchronized Optional<Track> onNextTrack(NextTrack msg) {
-        if (tracks.isEmpty()) return Optional.empty();
+        if (tracks.isEmpty())
+            return Optional.empty();
         Track next = tracks.remove(0);
         return Optional.of(next);
     }
 
     public synchronized List<Track> getState() {
         return Collections.unmodifiableList(new ArrayList<>(tracks));
+    }
+
+    public synchronized List<Track> getTracks() {
+        return tracks;
     }
 
     private void sortPlaylist() {
