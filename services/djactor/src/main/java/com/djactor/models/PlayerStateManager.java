@@ -1,5 +1,8 @@
 package com.djactor.models;
 
+import java.time.Instant;
+import java.util.Optional;
+
 /**
  * Represents the state of a media player and contains data about the current
  * song being played. also manages skip/prev/pause actions
@@ -7,63 +10,75 @@ package com.djactor.models;
  */
 public class PlayerStateManager {
     private PlayerStatus status; // status of the player - enum
-    private int currentTrackID;
+    private Track currentTrack;
     private long positionMs; // current position in milliseconds in the current song- synced with front
-    // TODO : playlist/music variables to add
+    private final PlaylistActorLogic playlist;
 
-    // constructor that sets the state manager to a default status
+    // constructor that sets the state manager to a default status and default
+    // playlist
     public PlayerStateManager() {
+        this.playlist = new PlaylistActorLogic();
         setIdle();
     }
 
-    // TODO : constructor that sets the state manager with a default playlist
-    // public PlayerStateManager(playlist) {
-    // set playlist
-    // startNewSong(first song in playlist);
-    // }
+    public PlayerStateManager(PlaylistActorLogic playlist) {
+        this.playlist = playlist;
+        setIdle();
+    }
 
     /**
      * performs actions to move to the next song in the playlist
      */
-    public synchronized void nextSong(boolean test) {
-        if (test) // if next song in play list or no playlist
-            startNewSong(0); // TODO : add next song in playlist
-        else {
-            setIdle();
-        }
-    }
+    public synchronized void nextSong() {
+        Optional<Track> nextTrack = playlist.onNextTrack(new PlaylistActorLogic.NextTrack(true));
 
-    /**
-     * performs actions to move to the prev song
-     */
-    public synchronized void prevSong(boolean test) {
-        if (test || getPositionMs() < 3000) // if no prev song in play list or if at the beginning of the song (<3s)
-            setPositionMs(0);
-        else if (test) {
-            startNewSong(0); // TODO : play prev in playlist
+        if (nextTrack.isPresent()) {
+            Track track = nextTrack.get();
+            startNewSong(track);
         } else {
             setIdle();
         }
+        return;
+    }
+
+    /**
+     * performs actions to move to the beginning of the current song by clicking the
+     * prev button
+     */
+    public synchronized void beginningOfSong() {
+        if (this.getCurrentTrack().equals(Track.EMPTY_TRACK)) {
+            return;
+        }
+        setPositionMs(0);
     }
 
     /**
      * Toggles between PLAYING and PAUSED states
      * if STOPPED, does nothing
      */
-    public synchronized void togglePlayPause() { // TODO check if theres a song
-        if (this.status == PlayerStatus.PLAYING)
+    public synchronized PlayerStatus togglePlayPause() {
+        if (this.getCurrentTrack().equals(Track.EMPTY_TRACK)) {
+            return this.status;
+        }
+        if (this.status == PlayerStatus.PLAYING) {
             this.status = PlayerStatus.PAUSED;
-        else
+        } else {
             this.status = PlayerStatus.PLAYING;
+        }
+        return this.status;
     }
 
     /**
      * Starts playing a new song from the beginning
      * 
      * @param trackID ID of the track to play
+     * @throws IllegalArgumentException if trackID is zero
      */
-    public synchronized void startNewSong(int trackID) {
-        setCurrentTrackID(trackID);
+    public synchronized void startNewSong(Track track) {
+        if (track.equals(Track.EMPTY_TRACK)) {
+            throw new IllegalArgumentException("Track ID cannot be zero");
+        }
+        setCurrentTrack(track);
         this.status = PlayerStatus.PLAYING;
         this.positionMs = 0;
     }
@@ -73,19 +88,37 @@ public class PlayerStateManager {
      * called by a scheduler every 250ms when playing
      */
     public void incrementPosition() {
-        if (this.status == PlayerStatus.PLAYING) {
+        if (this.status == PlayerStatus.PLAYING && !this.currentTrack.equals(Track.EMPTY_TRACK)) {
             this.positionMs += 250;
+
+            Track currentTrack = getCurrentTrack();
+            if (currentTrack != null && positionMs >= currentTrack.getDurationMs()) {
+                nextSong();
+            }
         }
-        // TODO : if (positionMs >= trackDuration){ nextSong();}
     }
 
     /**
      * sets the player to idle (default) state
      */
     public void setIdle() {
+        playlist.clearTracks();
         this.status = PlayerStatus.STOPPED;
-        this.currentTrackID = 0;
+        this.currentTrack = Track.EMPTY_TRACK;
         this.positionMs = 0;
+    }
+
+    /**
+     * add a new song to the playlist
+     */
+    public void addSongToPlaylist(long id, String title, String url, int score, long durationMs, Instant addedAt) {
+        boolean wasEmpty = playlist.getState().isEmpty();
+        Track track = new Track(id, title, url, score, durationMs, addedAt);
+        playlist.onAddTrack(new PlaylistActorLogic.AddTrack(track));
+
+        if (wasEmpty && this.currentTrack.equals(Track.EMPTY_TRACK)) {
+            nextSong(); // start playing the new song if the playlist was empty and the current song too
+        }
     }
 
     // getters/setters
@@ -98,22 +131,26 @@ public class PlayerStateManager {
         this.status = status;
     }
 
-    public int getCurrentTrackID() {
-        return currentTrackID;
+    public Track getCurrentTrack() {
+        return this.currentTrack;
     }
 
     /**
      * @throws IllegalArgumentException if currentTrackId is negative
      */
-    public void setCurrentTrackID(int currentTrackId) {
-        if (currentTrackId < 0) {
-            throw new IllegalArgumentException("Track ID cannot be negative");
+    public void setCurrentTrack(Track currentTrack) {
+        if (currentTrack.getId() < 0) {
+            throw new IllegalArgumentException("Track ID cannot be zero or negative");
         }
-        this.currentTrackID = currentTrackId;
+        this.currentTrack = currentTrack;
     }
 
     public long getPositionMs() {
         return positionMs;
+    }
+
+    public PlaylistActorLogic getPlaylist() {
+        return playlist;
     }
 
     /**
