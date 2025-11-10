@@ -1,12 +1,11 @@
 version: "3.9"
 
 services:
-
   djactor:
     build: ./services/djactor
     container_name: djactor
     ports:
-      - "8080:8080"
+      - "8081:8081"
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - SPRING_RABBITMQ_HOST=rabbitmq
@@ -20,7 +19,7 @@ services:
     build: ./services/djroom
     container_name: djroom
     ports:
-      - "8081:8080"
+      - "8082:8082"
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - SPRING_RABBITMQ_HOST=rabbitmq
@@ -30,19 +29,6 @@ services:
     networks:
       - app-network
 
-  playistactor:
-    build: ./services/playistactor
-    container_name: playistactor
-    ports:
-      - "8082:8080"
-    environment:
-      - SPRING_PROFILES_ACTIVE=prod
-      - SPRING_RABBITMQ_HOST=rabbitmq
-      - SPRING_RABBITMQ_PORT=5672
-    depends_on:
-      - rabbitmq
-    networks:
-      - app-network
 
 
   frontend:
@@ -53,17 +39,15 @@ services:
     depends_on:
       - djactor
       - djroom
-      - playistactor
     networks:
       - app-network
-
 
   rabbitmq:
     image: rabbitmq:3-management
     container_name: rabbitmq
     ports:
-      - "5672:5672"   
-      - "15672:15672" 
+      - "5672:5672"     
+      - "15672:15672"    
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
@@ -73,7 +57,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
 
 networks:
   app-network:
