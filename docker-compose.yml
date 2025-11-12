@@ -32,8 +32,8 @@ services:
 
 
   frontend:
-    build: ./frontend
-    container_name: frontend
+    build: ./front-end
+    container_name: front-end
     ports:
       - "3000:80"
     depends_on:
