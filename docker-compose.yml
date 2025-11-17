@@ -32,8 +32,8 @@ services:
 
 
   frontend:
-    build: ./front-end
-    container_name: front-end
+    build: ./music-platform
+    container_name: music-platform
     ports:
       - "3000:80"
     depends_on:
