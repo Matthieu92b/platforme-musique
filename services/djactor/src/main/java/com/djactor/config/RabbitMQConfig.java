@@ -1,4 +1,4 @@
-package com.djactor.config;
+/*package com.djactor.config;
 
 import org.springframework.amqp.core.Queue;
 import org.springframework.context.annotation.Bean;
@@ -31,4 +31,4 @@ public class RabbitMQConfig {
     public Queue prevSongQueue() {
         return new Queue("prev-song", true);
     }
-}
+}*/
