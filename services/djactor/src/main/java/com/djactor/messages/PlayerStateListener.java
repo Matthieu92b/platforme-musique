@@ -1,4 +1,4 @@
-package com.djactor.messages;
+/*package com.djactor.messages;
 
 import com.djactor.services.PlayerService;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -36,4 +36,4 @@ public class PlayerStateListener {
     public void handlePreviousTrack(int roomID) {
         playerService.getPlayerState(roomID).beginningOfSong();
     }
-}
+}*/
