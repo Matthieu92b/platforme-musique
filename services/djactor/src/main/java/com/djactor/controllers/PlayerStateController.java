@@ -1,4 +1,4 @@
-package com.djactor.controllers;
+/*package com.djactor.controllers;
 
 import java.time.Instant;
 import java.util.List;
@@ -89,4 +89,4 @@ public class PlayerStateController {
     public List<Track> getPlaylist(@PathVariable("roomID") int id) {
         return playerService.getPlayerState(id).getPlaylist().getState();
     }
-}
+}*/

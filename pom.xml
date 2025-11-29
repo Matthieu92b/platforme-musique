@@ -22,6 +22,7 @@
     </properties>
 
     <modules>
+        <module>actor-framework</module>
         <module>services/djroom</module>
         <module>services/djactor</module>
     </modules>

@@ -70,8 +70,7 @@ public class PlayerStateManager {
 
     /**
      * Starts playing a new song from the beginning
-     * 
-     * @param trackID ID of the track to play
+     *
      * @throws IllegalArgumentException if trackID is zero
      */
     public synchronized void startNewSong(Track track) {

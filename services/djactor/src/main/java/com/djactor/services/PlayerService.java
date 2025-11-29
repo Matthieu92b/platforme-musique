@@ -1,4 +1,4 @@
-package com.djactor.services;
+/*package com.djactor.services;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -13,6 +13,7 @@ import com.djactor.models.PlayerStateManager;
  * 
  * should be 1 state manager per room
  */
+/*
 @Service
 public class PlayerService {
     private Map<Integer, PlayerStateManager> playerStates = new HashMap<>();
@@ -27,6 +28,7 @@ public class PlayerService {
     /**
      * if playing, increments the timer of all player states every 250ms
      */
+/*
     @Scheduled(fixedRate = 250)
     public synchronized void updateStateManagersTimer() {
         playerStates.values().forEach(stateManager -> {
@@ -40,6 +42,7 @@ public class PlayerService {
      * @param roomID corresponding room id
      * @return new PlayerStateManager if none existed, existing one otherwise
      */
+/*
     public synchronized PlayerStateManager addPlayerState(int roomID) {
         return playerStates.computeIfAbsent(roomID, id -> new PlayerStateManager());
     }
@@ -47,6 +50,7 @@ public class PlayerService {
     /**
      * @return the manager for the given id, null if none existed
      */
+/*
     public synchronized PlayerStateManager deletePlayerState(int roomID) {
         return playerStates.remove(roomID);
     }
@@ -54,6 +58,7 @@ public class PlayerService {
     /**
      * @return PlayerStateManager if present, null otherwise
      */
+/*
     public synchronized PlayerStateManager getPlayerState(int roomID) {
         return playerStates.get(roomID);
     }
@@ -61,7 +66,9 @@ public class PlayerService {
     /**
      * @return PlayerStates map
      */
+/*
     public synchronized Map<Integer, PlayerStateManager> getPlayerStates() {
         return playerStates;
     }
 }
+*/
