@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -18,8 +19,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * DJActor : gère le player d'une seule room.
- *
- * Path typique : "djactor/dj-room-xxxx"
+ * Path typique : "djactor/dj-<roomId>"
  */
 public class DJActor implements Actor {
 
@@ -29,28 +29,24 @@ public class DJActor implements Actor {
     private PlayerStateManager state;
     private ScheduledExecutorService scheduler;
 
-    // 🔹 Constructeur par défaut (utilisé par le framework si besoin)
-    public DJActor() {
-    }
+    // Constructeur par défaut (pas obligatoire, mais ok)
+    public DJActor() {}
 
-    // 🔹 Constructeur requis par le framework : ActorSystem.actorOf(DJActor.class, "dj-room-XXXX")
+    // Constructeur requis par ton framework : ActorSystem.actorOf(DJActor.class, "dj-" + roomId)
     public DJActor(String name) {
-        if (name != null && name.startsWith("dj-room-")) {
-            this.roomId = name.substring("dj-room-".length());
-        } else {
-            this.roomId = name;
-        }
+        this.roomId = name; // la vraie extraction se fait dans preStart()
     }
 
     @Override
     public void preStart(ActorContext ctx) {
-        // path ex: "djactor/dj-room-e765eb71"
+        // path ex: "djactor/dj-room-e765eb71" ou "djactor/dj-room-xxxx"
         String path = ctx.self().path();
         int idx = path.lastIndexOf('/');
-        String localName = (idx >= 0) ? path.substring(idx + 1) : path; // dj-room-e765eb71
+        String localName = (idx >= 0) ? path.substring(idx + 1) : path; // ex: "dj-room-xxx" ou "dj-room-xxx"
 
+        // Ton DJActorFactory crée "dj-" + roomId, donc localName commence par "dj-"
         if (localName.startsWith("dj-")) {
-            this.roomId = localName.substring("dj-".length());  // "room-xxxx"
+            this.roomId = localName.substring("dj-".length()); // "room-xxxx"
         } else {
             this.roomId = localName;
         }
@@ -59,18 +55,13 @@ public class DJActor implements Actor {
 
         // Timer interne pour avancer la position toutes les 250ms
         scheduler = Executors.newSingleThreadScheduledExecutor();
-        scheduler.scheduleAtFixedRate(
-                () -> {
-                    try {
-                        state.incrementPosition();
-                    } catch (Exception e) {
-                        log.error("Error incrementing position for room {}", roomId, e);
-                    }
-                },
-                0,
-                250,
-                TimeUnit.MILLISECONDS
-        );
+        scheduler.scheduleAtFixedRate(() -> {
+            try {
+                state.incrementPosition();
+            } catch (Exception e) {
+                log.error("Error incrementing position for room {}", roomId, e);
+            }
+        }, 0, 250, TimeUnit.MILLISECONDS);
 
         log.info("🎧 DJActor started for room {}", roomId);
     }
@@ -85,8 +76,13 @@ public class DJActor implements Actor {
             case "LOAD_TRACK" -> handleLoadTrack(message.payload());
             case "PLAY" -> handlePlay();
             case "PAUSE" -> handlePause();
-            case "NEXT" -> handleNext();
+            case "NEXT" -> log.info("NEXT ignored (managed by djroom) for room {}", roomId);
+
             case "PREV" -> handlePrev();
+
+            // ✅ NOUVEAU : ask local via CompletableFuture en payload
+            case "GET_STATE" -> handleGetState(message.payload());
+
             default -> log.warn("[DJActor {}] Unknown message type: {}", roomId, message.type());
         }
 
@@ -127,7 +123,7 @@ public class DJActor implements Actor {
                 return;
             }
         }
-        // Cas d'un envoi local éventuellement typé
+        // Cas d'un envoi local typé
         else if (payload instanceof LoadTrackMsg msg) {
             id = msg.id();
             url = msg.url();
@@ -139,7 +135,7 @@ public class DJActor implements Actor {
         }
 
         Track track = new Track(
-                (int) id,  // adapte si ton Track utilise un long
+                id,
                 title,
                 url,
                 0,
@@ -149,6 +145,7 @@ public class DJActor implements Actor {
 
         log.info("📥 LOAD_TRACK in room {}: {} (id={})", roomId, track.getTitle(), track.getId());
 
+        // On ajoute en playlist interne (si tu gardes ce modèle)
         state.addSongToPlaylist(
                 track.getId(),
                 track.getTitle(),
@@ -158,9 +155,9 @@ public class DJActor implements Actor {
                 track.getAddedAt()
         );
 
-        if (state.getCurrentTrack() == null) {
-            state.startNewSong(track);
-        }
+        // Si aucun currentTrack, on démarre
+        state.startNewSong(track);
+        state.setStatus(PlayerStatus.PLAYING);
     }
 
     private void handlePlay() {
@@ -181,6 +178,44 @@ public class DJActor implements Actor {
     private void handlePrev() {
         log.info("⏮️ PREV command for room {}", roomId);
         state.beginningOfSong();
+    }
+
+    /**
+     * ✅ GET_STATE : complète un future passé en payload
+     * Payload attendu : CompletableFuture<Map<String,Object>>
+     */
+    private void handleGetState(Object payload) {
+        if (!(payload instanceof CompletableFuture<?> future)) {
+            log.warn("[DJActor {}] GET_STATE expects CompletableFuture payload", roomId);
+            return;
+        }
+
+        @SuppressWarnings("unchecked")
+        CompletableFuture<Map<String, Object>> typed = (CompletableFuture<Map<String, Object>>) future;
+
+        Track current = state.getCurrentTrack();
+        if (current == null) current = Track.EMPTY_TRACK;
+
+        Map<String, Object> snap = new HashMap<>();
+        snap.put("roomId", roomId);
+        snap.put("status", state.getStatus().name());
+        snap.put("positionMs", state.getPositionMs());
+        snap.put("queueSize", state.getPlaylist().getState().size());
+
+        // Track courante
+        if (!current.equals(Track.EMPTY_TRACK)) {
+            snap.put("trackId", current.getId());
+            snap.put("currentTitle", current.getTitle());
+            snap.put("currentUrl", current.getUrl());
+            snap.put("durationMs", current.getDurationMs());
+        } else {
+            snap.put("trackId", null);
+            snap.put("currentTitle", null);
+            snap.put("currentUrl", null);
+            snap.put("durationMs", 0L);
+        }
+
+        typed.complete(snap);
     }
 
     @Override

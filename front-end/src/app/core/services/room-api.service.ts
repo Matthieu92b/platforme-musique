@@ -10,13 +10,14 @@ import {
   ChatMessageRequest
 } from '../models/room.models';
 import { Observable } from 'rxjs';
-
+import { PlaylistStateDto } from '../models/playlist.models';
+import { PlayerState } from '../models/room.models';
 @Injectable({ providedIn: 'root' })
 export class RoomApiService {
   // Avec proxy Angular : /api → http://localhost:8082
   private readonly baseUrl = '/api/rooms';
   // Si tu ne veux pas de proxy : private readonly baseUrl = 'http://localhost:8082/api/rooms';
-
+  private readonly playerBaseUrl = '/api/player';
   constructor(private http: HttpClient) {}
 
   // ---------- CREATE ROOM : renvoie un vrai JSON ----------
@@ -93,10 +94,10 @@ export class RoomApiService {
   }
 
   // ---------- PLAYLIST (pour l’instant texte aussi) ----------
-  getPlaylist(roomId: string): Observable<string> {
-    return this.http.get<string>(
-      `${this.baseUrl}/${roomId}/playlist`,
-      { responseType: 'text' as 'json' }
-    );
+  getPlaylist(roomId: string): Observable<PlaylistStateDto> {
+    return this.http.get<PlaylistStateDto>(`${this.baseUrl}/${roomId}/playlist`);
+  }
+  getPlayerState(roomId: string) {
+    return this.http.get<PlayerState>(`${this.playerBaseUrl}/${roomId}/state`);
   }
 }

@@ -1,26 +1,14 @@
-# Étape 1 : Build de l'application Angular
-FROM node:20-alpine AS build
+# ===== DEV FRONTEND (no nginx) =====
+FROM node:20-alpine
+
 WORKDIR /app
 
-# Copier les fichiers de dépendances
 COPY package*.json ./
-
-# Installer les dépendances
 RUN npm ci
 
-# Copier le reste du code source
-COPY ../music-platform .
+COPY . .
 
-# Build Angular en mode production
-RUN npm run build -- --configuration production
+EXPOSE 4200
 
-# Étape 2 : Servir le build avec Nginx
-FROM nginx:alpine
-# Copier les fichiers générés par Angular dans Nginx
-COPY --from=build /app/dist/front-end /usr/share/nginx/html
-
-# Exposer le port HTTP
-EXPOSE 80
-
-# Lancer Nginx
-CMD ["nginx", "-g", "daemon off;"]
+# Angular dev server accessible depuis l'extérieur du container
+CMD ["npm", "run", "start", "--", "--host", "0.0.0.0", "--port", "4200", "--poll", "2000"]

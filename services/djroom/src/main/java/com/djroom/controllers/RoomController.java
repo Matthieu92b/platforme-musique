@@ -12,6 +12,10 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import com.djroom.actors.PlaylistActor;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+
 
 @RestController
 @RequestMapping("/api/rooms")
@@ -38,6 +42,11 @@ public class RoomController {
         log.info("Creating room {} for user {}", roomId, req.userId);
 
         try {
+            // ✅ 1) Demande au service chat-actor de créer le ChatActor de cette room
+            ActorRef chatManager = actorSystem.actorSelection("chat-actor/chat-manager");
+            chatManager.tell(Message.of("CREATE_CHAT", roomId), null);
+
+            // ✅ 2) Crée RoomActor
             ActorRef roomActor = actorSystem.actorOf(RoomActor.class, roomId);
             rooms.put(roomId, roomActor);
 
@@ -68,6 +77,7 @@ public class RoomController {
     public ResponseEntity<String> joinRoom(
             @PathVariable String roomId,
             @RequestBody JoinRoomRequest req) {
+
 
         ActorRef roomActor = rooms.get(roomId);
         if (roomActor == null) {
@@ -179,7 +189,7 @@ public class RoomController {
         log.info("Next track requested for room {}", roomId);
 
         roomActor.tell(
-                Message.of("GET_NEXT_TRACK", null),
+                Message.of("NEXT", null),
                 null
         );
 
@@ -261,14 +271,31 @@ public class RoomController {
         return ResponseEntity.accepted().body("Chat message sent");
     }
     @GetMapping("/{roomId}/playlist")
-    public ResponseEntity<String> getPlaylist(@PathVariable String roomId) {
-        ActorRef roomActor = rooms.get(roomId);
-        if (roomActor == null) {
-            return ResponseEntity.notFound().build();
-        }
+    public ResponseEntity<?> getPlaylist(@PathVariable String roomId) {
+        try {
+            // Path de l'acteur : serviceName "djroom" + nom "playlist-" + roomId
+            String playlistPath = "djroom/playlist-" + roomId;
 
-        roomActor.tell(Message.of("GET_PLAYLIST", null), null);
-        return ResponseEntity.accepted().body("Playlist request sent");
+            ActorRef playlistActor = actorSystem.actorSelection(playlistPath);
+
+            CompletableFuture<PlaylistActor.PlaylistStateMsg> future = new CompletableFuture<>();
+
+            // On passe le future en payload (ask pattern local)
+            playlistActor.tell(Message.of("GET_PLAYLIST", future), null);
+
+            PlaylistActor.PlaylistStateMsg state = future.get(1, TimeUnit.SECONDS);
+
+            // ✅ Spring va sérialiser PlaylistStateMsg en JSON : { "tracks": [ ... ] }
+            return ResponseEntity.ok(state);
+
+        } catch (IllegalArgumentException e) {
+            // actorSelection a échoué (room inexistante / pas de playlist pour cette room)
+            log.warn("PlaylistActor not found for room {}", roomId);
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            log.error("Failed to get playlist for room {}", roomId, e);
+            return ResponseEntity.status(504).body("Timeout while getting playlist");
+        }
     }
 
     // =========================================================================
