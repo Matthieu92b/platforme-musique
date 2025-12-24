@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Manages the playlist for a specific room.
@@ -62,7 +63,7 @@ public class PlaylistActor implements Actor {
             case "ADD_TRACK" -> handleAddTrack((AddTrackMsg) message.payload(), ctx);
             case "VOTE_TRACK" -> handleVote((VoteTrackMsg) message.payload(), ctx);
             case "GET_NEXT_TRACK" -> handleGetNextTrack(ctx);
-            case "GET_PLAYLIST" -> handleGetPlaylist(ctx);
+            case "GET_PLAYLIST" -> handleGetPlaylist(message.payload(), ctx); // ✅ changé
             case "REMOVE_TRACK" -> handleRemoveTrack((RemoveTrackMsg) message.payload(), ctx);
             default -> log.warn("Unknown message type for PlaylistActor {}: {}", roomId, message.type());
         }
@@ -72,6 +73,7 @@ public class PlaylistActor implements Actor {
 
 
     private void handleAddTrack(AddTrackMsg msg, ActorContext ctx) {
+        boolean wasEmptyBefore = tracks.isEmpty();
         PlaylistTrack track = new PlaylistTrack(
                 nextTrackId++,
                 msg.url,
@@ -96,8 +98,8 @@ public class PlaylistActor implements Actor {
         }
 
         // If it's the first track, notify DJActor to load it
-        if (tracks.size() == 1) {
-            notifyDJActorLoadTrack(track, ctx);
+        if (wasEmptyBefore && !tracks.isEmpty()) {
+            notifyDJActorLoadTrack(tracks.get(0), ctx);
         }
     }
 
@@ -159,12 +161,22 @@ public class PlaylistActor implements Actor {
         }
     }
 
-    private void handleGetPlaylist(ActorContext ctx) {
+    private void handleGetPlaylist(Object payload, ActorContext ctx) {
         List<PlaylistTrack> snapshot = new ArrayList<>(tracks);
+        PlaylistStateMsg stateMsg = new PlaylistStateMsg(snapshot);
 
+        // 1️⃣ Cas ask local : payload = CompletableFuture
+        if (payload instanceof CompletableFuture<?> future) {
+            @SuppressWarnings("unchecked")
+            CompletableFuture<PlaylistStateMsg> typed =
+                    (CompletableFuture<PlaylistStateMsg>) future;
+            typed.complete(stateMsg);
+        }
+
+        // 2️⃣ Cas acteur → acteur (déjà existant)
         if (ctx.sender() != null) {
             ctx.sender().tell(
-                    Message.of("PLAYLIST_STATE", new PlaylistStateMsg(snapshot)),
+                    Message.of("PLAYLIST_STATE", stateMsg),
                     ctx.self()
             );
         }

@@ -31,3 +31,12 @@ export interface ChatMessageRequest {
   userId: string;
   message: string;
 }
+export interface PlayerState {
+  roomId: string;
+  status: string;
+  currentTitle: string | null;
+  currentUrl: string | null;
+  positionMs: number;
+  durationMs: number;
+  queueSize: number;
+}

@@ -27,15 +27,16 @@ public class RemoteDispatcher {
     private final LocalDispatcher localDispatcher;
     private final ObjectMapper objectMapper;
     private SimpleMessageListenerContainer listenerContainer;
-
+    private final ActorSystem system;
     public RemoteDispatcher(String serviceName,
                             RabbitTemplate rabbitTemplate,
                             ConnectionFactory connectionFactory,
-                            LocalDispatcher localDispatcher) {
+                            LocalDispatcher localDispatcher,ActorSystem system) {
         this.serviceName = serviceName;
         this.rabbitTemplate = rabbitTemplate;
         this.connectionFactory = connectionFactory;
         this.localDispatcher = localDispatcher;
+        this.system=system;
         this.objectMapper = new ObjectMapper();
         this.objectMapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
 
@@ -163,7 +164,7 @@ public class RemoteDispatcher {
 
                     // Reconstruct sender
                     ActorRef sender = senderPath != null
-                            ? new RemoteActorRef(senderPath, null)
+                            ? new RemoteActorRef(senderPath, system)
                             : null;
 
                     // Dispatch locally
