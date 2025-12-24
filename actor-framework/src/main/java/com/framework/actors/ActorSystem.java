@@ -37,7 +37,8 @@ public class ActorSystem implements AutoCloseable {
                 serviceName,
                 rabbitTemplate,
                 connectionFactory,
-                localDispatcher
+                localDispatcher,
+                this
         );
 
         log.info("🚀 Actor system '{}' started", serviceName);

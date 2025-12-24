@@ -25,5 +25,6 @@
         <module>actor-framework</module>
         <module>services/djroom</module>
         <module>services/djactor</module>
+        <module>services/chatactor</module>
     </modules>
 </project>

@@ -1,10 +1,14 @@
 // src/app/core/models/playlist.models.ts
-export interface PlaylistTrack {
+export interface PlaylistTrackDto {
   id: number;
   url: string;
   title: string;
   durationMs: number;
   score: number;
-  addedAt: string;   // Instant → string ISO
+  addedAt: string;
   addedBy: string;
+}
+
+export interface PlaylistStateDto {
+  tracks: PlaylistTrackDto[];
 }
