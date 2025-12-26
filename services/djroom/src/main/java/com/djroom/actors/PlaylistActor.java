@@ -22,6 +22,7 @@ import java.util.concurrent.CompletableFuture;
  * - fourniture du "next track" et notification du DJActor
  */
 public class PlaylistActor implements Actor {
+    private PlaylistTrack currentTrack = null;
 
     private static final Logger log = LoggerFactory.getLogger(PlaylistActor.class);
 
@@ -95,24 +96,27 @@ public class PlaylistActor implements Actor {
      * déclenche le chargement côté DJActor (premier track).
      */
     private void handleAddTrack(AddTrackMsg msg, ActorContext ctx) {
-        boolean wasEmptyBefore = tracks.isEmpty();
-
         PlaylistTrack track = new PlaylistTrack(
                 nextTrackId++,
                 msg.url,
                 msg.title,
                 msg.durationMs,
-                0, // score initial
+                0,
                 Instant.now(),
                 msg.addedBy
         );
 
-        tracks.add(track);
-        sortPlaylist();
+        boolean startNow = (currentTrack == null);
+
+        if (startNow) {
+            currentTrack = track;
+        } else {
+            tracks.add(track);
+            sortPlaylist();
+        }
 
         log.info("Track added to room {}: title='{}', id={}", roomId, track.getTitle(), track.getId());
 
-        // Notifie l'acteur appelant (souvent RoomActor) que le track a été ajouté
         if (ctx.sender() != null) {
             ctx.sender().tell(
                     Message.of("TRACK_ADDED", new TrackAddedMsg(track)),
@@ -120,11 +124,11 @@ public class PlaylistActor implements Actor {
             );
         }
 
-        // Si c'était le premier track, on demande au DJActor de le charger
-        if (wasEmptyBefore && !tracks.isEmpty()) {
-            notifyDJActorLoadTrack(tracks.get(0), ctx);
+        if (startNow) {
+            notifyDJActorLoadTrack(track, ctx);
         }
     }
+
 
     /**
      * Applique un vote (+1 / -1) sur un track, retrie, et renvoie le nouveau score.
@@ -168,6 +172,8 @@ public class PlaylistActor implements Actor {
      */
     private void handleGetNextTrack(ActorContext ctx) {
         if (tracks.isEmpty()) {
+            currentTrack = null;
+
             log.info("No more tracks in playlist for room {}", roomId);
 
             if (ctx.sender() != null) {
@@ -176,15 +182,13 @@ public class PlaylistActor implements Actor {
             return;
         }
 
-        // Le premier élément correspond au meilleur choix après tri
         PlaylistTrack next = tracks.remove(0);
+        currentTrack = next;
 
         log.info("Next track for room {}: trackId={}, title='{}'", roomId, next.getId(), next.getTitle());
 
-        // Déclenche le chargement côté DJActor
         notifyDJActorLoadTrack(next, ctx);
 
-        // Notifie l'acteur appelant
         if (ctx.sender() != null) {
             ctx.sender().tell(
                     Message.of("NEXT_TRACK", new NextTrackMsg(next)),
@@ -192,6 +196,7 @@ public class PlaylistActor implements Actor {
             );
         }
     }
+
 
     /**
      * Renvoie l'état de la playlist sous forme de snapshot.
