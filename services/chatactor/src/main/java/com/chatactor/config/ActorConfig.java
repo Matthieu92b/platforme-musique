@@ -13,8 +13,6 @@ public class ActorConfig {
     @Bean(destroyMethod = "close")
     public ActorSystem actorSystem(RabbitTemplate rabbitTemplate) {
         ActorSystem system = ActorSystem.create("chat-actor", rabbitTemplate);
-
-        // ✅ manager unique
         system.actorOf(ChatManagerActor.class, "chat-manager");
 
         return system;

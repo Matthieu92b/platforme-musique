@@ -3,30 +3,35 @@ package com.framework.actors;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Base interface for all actors.
- * Actors process messages asynchronously and maintain their own state.
+ * Interface de base pour tous les acteurs.
+ * Un acteur traite des messages de manière asynchrone
+ * et conserve son propre état interne.
  */
 public interface Actor {
 
     /**
-     * Called when the actor receives a message.
-     * Always executed on the actor's mailbox thread.
+     * Appelée lorsqu’un message est reçu par l’acteur.
+     * Cette méthode est toujours exécutée dans le thread
+     * associé à la mailbox de l’acteur.
      */
     CompletableFuture<Void> onReceive(Message message, ActorContext ctx);
 
     /**
-     * Called before the actor starts processing messages.
+     * Appelée avant que l’acteur ne commence à traiter des messages.
+     * Utile pour l’initialisation (état, ressources, acteurs enfants, etc.).
      */
     default void preStart(ActorContext ctx) throws Exception {}
 
     /**
-     * Called after the actor stops.
+     * Appelée après l’arrêt de l’acteur.
+     * Utile pour libérer les ressources (threads, connexions, etc.).
      */
     default void postStop(ActorContext ctx) throws Exception {}
 
     /**
-     * Called when the actor throws an exception.
-     * Return the supervision directive.
+     * Appelée lorsqu’une exception est levée pendant le traitement d’un message.
+     * Permet de définir la stratégie de supervision à appliquer
+     * (ex: RESTART, STOP, RESUME).
      */
     default SupervisionDirective onFailure(Throwable cause, Message message) {
         return SupervisionDirective.RESTART;

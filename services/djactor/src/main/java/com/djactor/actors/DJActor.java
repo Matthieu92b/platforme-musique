@@ -10,15 +10,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
-import java.util.Map;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 /**
- * DJActor : gère le player d'une seule room.
+ * DJActor : gère l'état du player pour une room.
  * Path typique : "djactor/dj-<roomId>"
  */
 public class DJActor implements Actor {
@@ -29,31 +29,39 @@ public class DJActor implements Actor {
     private PlayerStateManager state;
     private ScheduledExecutorService scheduler;
 
-    // Constructeur par défaut (pas obligatoire, mais ok)
-    public DJActor() {}
-
-    // Constructeur requis par ton framework : ActorSystem.actorOf(DJActor.class, "dj-" + roomId)
-    public DJActor(String name) {
-        this.roomId = name; // la vraie extraction se fait dans preStart()
+    public DJActor() {
     }
 
+    /**
+     * Constructeur compatible avec ActorSystem.actorOf(DJActor.class, "dj-" + roomId).
+     * Le roomId final est déterminé dans preStart() à partir du path réel.
+     */
+    public DJActor(String name) {
+        this.roomId = name;
+    }
+
+    /**
+     * Initialisation :
+     * - dérive roomId depuis le path
+     * - initialise le state manager
+     * - démarre un scheduler qui met à jour la position régulièrement
+     */
     @Override
     public void preStart(ActorContext ctx) {
-        // path ex: "djactor/dj-room-e765eb71" ou "djactor/dj-room-xxxx"
         String path = ctx.self().path();
         int idx = path.lastIndexOf('/');
-        String localName = (idx >= 0) ? path.substring(idx + 1) : path; // ex: "dj-room-xxx" ou "dj-room-xxx"
+        String localName = (idx >= 0) ? path.substring(idx + 1) : path;
 
-        // Ton DJActorFactory crée "dj-" + roomId, donc localName commence par "dj-"
+        // Le factory crée "dj-" + roomId, donc on retire le préfixe si présent
         if (localName.startsWith("dj-")) {
-            this.roomId = localName.substring("dj-".length()); // "room-xxxx"
+            this.roomId = localName.substring("dj-".length());
         } else {
             this.roomId = localName;
         }
 
         this.state = new PlayerStateManager();
 
-        // Timer interne pour avancer la position toutes les 250ms
+        // Timer interne pour avancer la position
         scheduler = Executors.newSingleThreadScheduledExecutor();
         scheduler.scheduleAtFixedRate(() -> {
             try {
@@ -63,9 +71,12 @@ public class DJActor implements Actor {
             }
         }, 0, 250, TimeUnit.MILLISECONDS);
 
-        log.info("🎧 DJActor started for room {}", roomId);
+        log.info("DJActor started for room {}", roomId);
     }
 
+    /**
+     * Route les messages reçus vers les handlers.
+     */
     @Override
     public CompletableFuture<Void> onReceive(Message message, ActorContext ctx) {
         log.info("[DJActor {}] Received type={}", roomId, message.type());
@@ -76,11 +87,13 @@ public class DJActor implements Actor {
             case "LOAD_TRACK" -> handleLoadTrack(message.payload());
             case "PLAY" -> handlePlay();
             case "PAUSE" -> handlePause();
-            case "NEXT" -> log.info("NEXT ignored (managed by djroom) for room {}", roomId);
+
+            // La gestion du NEXT est pilotée côté djroom (playlist), ici on ignore
+            case "NEXT" -> log.debug("NEXT ignored for room {} (managed by djroom)", roomId);
 
             case "PREV" -> handlePrev();
 
-            // ✅ NOUVEAU : ask local via CompletableFuture en payload
+            // Ask local via CompletableFuture en payload
             case "GET_STATE" -> handleGetState(message.payload());
 
             default -> log.warn("[DJActor {}] Unknown message type: {}", roomId, message.type());
@@ -90,16 +103,21 @@ public class DJActor implements Actor {
     }
 
     private void handleInitPlayer() {
-        log.info("🟢 INIT_PLAYER for room {}", roomId);
+        log.info("INIT_PLAYER for room {}", roomId);
         state.setIdle();
     }
 
     private void handleStopPlayer() {
-        log.info("🔴 STOP_PLAYER for room {}", roomId);
+        log.info("STOP_PLAYER for room {}", roomId);
         state.setIdle();
     }
 
-    @SuppressWarnings("unchecked")
+    /**
+     * Charge un track.
+     * Deux formats supportés :
+     * - Map (désérialisation JSON depuis un transport type Rabbit)
+     * - LoadTrackMsg (appel typé local)
+     */
     private void handleLoadTrack(Object payload) {
         if (payload == null) {
             log.warn("LOAD_TRACK with null payload for room {}", roomId);
@@ -111,7 +129,6 @@ public class DJActor implements Actor {
         String title;
         long durationMs;
 
-        // Cas des messages JSON venus de djroom via Rabbit (désérialisés en Map)
         if (payload instanceof Map<?, ?> map) {
             try {
                 id = ((Number) map.get("id")).longValue();
@@ -119,18 +136,16 @@ public class DJActor implements Actor {
                 title = (String) map.get("title");
                 durationMs = ((Number) map.get("durationMs")).longValue();
             } catch (Exception e) {
-                log.error("Invalid LOAD_TRACK payload format: {}", payload, e);
+                log.error("Invalid LOAD_TRACK payload format for room {}: {}", roomId, payload, e);
                 return;
             }
-        }
-        // Cas d'un envoi local typé
-        else if (payload instanceof LoadTrackMsg msg) {
+        } else if (payload instanceof LoadTrackMsg msg) {
             id = msg.id();
             url = msg.url();
             title = msg.title();
             durationMs = msg.durationMs();
         } else {
-            log.error("Unsupported LOAD_TRACK payload type: {} for room {}", payload.getClass(), roomId);
+            log.error("Unsupported LOAD_TRACK payload type for room {}: {}", roomId, payload.getClass());
             return;
         }
 
@@ -143,9 +158,9 @@ public class DJActor implements Actor {
                 Instant.now()
         );
 
-        log.info("📥 LOAD_TRACK in room {}: {} (id={})", roomId, track.getTitle(), track.getId());
+        log.info("LOAD_TRACK for room {}: title='{}', id={}", roomId, track.getTitle(), track.getId());
 
-        // On ajoute en playlist interne (si tu gardes ce modèle)
+        // Mise à jour de la playlist interne (si ce modèle est conservé)
         state.addSongToPlaylist(
                 track.getId(),
                 track.getTitle(),
@@ -155,33 +170,28 @@ public class DJActor implements Actor {
                 track.getAddedAt()
         );
 
-        // Si aucun currentTrack, on démarre
+        // Démarre le track comme track courant
         state.startNewSong(track);
         state.setStatus(PlayerStatus.PLAYING);
     }
 
     private void handlePlay() {
-        log.info("▶️ PLAY command for room {}", roomId);
+        log.info("PLAY for room {}", roomId);
         state.setStatus(PlayerStatus.PLAYING);
     }
 
     private void handlePause() {
-        log.info("⏸️ PAUSE command for room {}", roomId);
+        log.info("PAUSE for room {}", roomId);
         state.togglePlayPause();
     }
 
-    private void handleNext() {
-        log.info("⏭️ NEXT command for room {}", roomId);
-        state.nextSong();
-    }
-
     private void handlePrev() {
-        log.info("⏮️ PREV command for room {}", roomId);
+        log.info("PREV for room {}", roomId);
         state.beginningOfSong();
     }
 
     /**
-     * ✅ GET_STATE : complète un future passé en payload
+     * Complète un future passé en payload.
      * Payload attendu : CompletableFuture<Map<String,Object>>
      */
     private void handleGetState(Object payload) {
@@ -194,7 +204,9 @@ public class DJActor implements Actor {
         CompletableFuture<Map<String, Object>> typed = (CompletableFuture<Map<String, Object>>) future;
 
         Track current = state.getCurrentTrack();
-        if (current == null) current = Track.EMPTY_TRACK;
+        if (current == null) {
+            current = Track.EMPTY_TRACK;
+        }
 
         Map<String, Object> snap = new HashMap<>();
         snap.put("roomId", roomId);
@@ -202,7 +214,6 @@ public class DJActor implements Actor {
         snap.put("positionMs", state.getPositionMs());
         snap.put("queueSize", state.getPlaylist().getState().size());
 
-        // Track courante
         if (!current.equals(Track.EMPTY_TRACK)) {
             snap.put("trackId", current.getId());
             snap.put("currentTitle", current.getTitle());
@@ -218,14 +229,19 @@ public class DJActor implements Actor {
         typed.complete(snap);
     }
 
+    /**
+     * Nettoyage à l'arrêt : stop du scheduler.
+     */
     @Override
     public void postStop(ActorContext ctx) {
-        log.info("🛑 DJActor stopped for room {}", roomId);
+        log.info("DJActor stopped for room {}", roomId);
+
         if (scheduler != null) {
             scheduler.shutdownNow();
         }
     }
 
-    // DTO local facultatif si tu veux tester en interne
-    public record LoadTrackMsg(long id, String url, String title, long durationMs) {}
+    // DTO local facultatif (utile en tests / appels typés)
+    public record LoadTrackMsg(long id, String url, String title, long durationMs) {
+    }
 }

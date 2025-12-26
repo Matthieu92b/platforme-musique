@@ -14,7 +14,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Handles remote communication via RabbitMQ.
+ * Dispatcher distant :
+ * - envoie des messages vers d'autres services via RabbitMQ
+ * - écoute la queue du service courant et redispatche localement
  */
 public class RemoteDispatcher {
 
@@ -25,66 +27,70 @@ public class RemoteDispatcher {
     private final RabbitTemplate rabbitTemplate;
     private final ConnectionFactory connectionFactory;
     private final LocalDispatcher localDispatcher;
-    private final ObjectMapper objectMapper;
-    private SimpleMessageListenerContainer listenerContainer;
     private final ActorSystem system;
-    public RemoteDispatcher(String serviceName,
-                            RabbitTemplate rabbitTemplate,
-                            ConnectionFactory connectionFactory,
-                            LocalDispatcher localDispatcher,ActorSystem system) {
+
+    // Sérialisation/désérialisation manuelle des enveloppes
+    private final ObjectMapper objectMapper;
+
+    private SimpleMessageListenerContainer listenerContainer;
+
+    public RemoteDispatcher(
+            String serviceName,
+            RabbitTemplate rabbitTemplate,
+            ConnectionFactory connectionFactory,
+            LocalDispatcher localDispatcher,
+            ActorSystem system
+    ) {
         this.serviceName = serviceName;
         this.rabbitTemplate = rabbitTemplate;
         this.connectionFactory = connectionFactory;
         this.localDispatcher = localDispatcher;
-        this.system=system;
+        this.system = system;
+
         this.objectMapper = new ObjectMapper();
         this.objectMapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
 
-        // ⚠️ PLUS BESOIN DE CONFIGURER LE CONVERTER ICI
-        // Il est maintenant configuré dans RabbitMQConfig.rabbitTemplate()
-
-        // Setup RabbitMQ infrastructure
+        // L'infrastructure RabbitMQ (exchange/queue/binding) est créée au démarrage
         setupRabbitMQ();
 
-        // Start listening
+        // Démarre l'écoute des messages entrants
         startListening();
     }
 
     /**
-     * Setup RabbitMQ exchange, queue, and binding.
+     * Déclare l'exchange, la queue du service, et le binding associé.
      */
     private void setupRabbitMQ() {
         try {
             RabbitAdmin admin = new RabbitAdmin(connectionFactory);
 
-            // Create exchange
             TopicExchange exchange = new TopicExchange(EXCHANGE_NAME, true, false);
             admin.declareExchange(exchange);
-            log.info("📡 Exchange declared: {}", EXCHANGE_NAME);
+            log.info("Exchange declared: {}", EXCHANGE_NAME);
 
-            // Create queue
             String queueName = serviceName + ".messages";
             Queue queue = new Queue(queueName, true);
             admin.declareQueue(queue);
-            log.info("📥 Queue declared: {}", queueName);
+            log.info("Queue declared: {}", queueName);
 
-            // Create binding
             Binding binding = BindingBuilder
                     .bind(queue)
                     .to(exchange)
                     .with(serviceName + ".*");
             admin.declareBinding(binding);
-            log.info("🔗 Binding created: {} -> {} (pattern: {}.*)",
-                    queueName, EXCHANGE_NAME, serviceName);
+
+            log.info("Binding created: queue={} exchange={} pattern={}",
+                    queueName, EXCHANGE_NAME, serviceName + ".*");
 
         } catch (Exception e) {
-            log.error("❌ Failed to setup RabbitMQ", e);
+            log.error("Failed to setup RabbitMQ for service {}", serviceName, e);
             throw new RuntimeException("RabbitMQ setup failed", e);
         }
     }
 
     /**
-     * Send message to remote actor.
+     * Envoie un message vers un acteur distant.
+     * Le path attendu est de la forme : "<service>/<actorName>".
      */
     public void send(String targetPath, Message message, ActorRef sender) {
         try {
@@ -97,7 +103,7 @@ public class RemoteDispatcher {
             String actorName = parts[1];
             String routingKey = targetService + "." + actorName;
 
-            // On crée un Map simple -> JSON
+            // Enveloppe simple sérialisée en JSON
             Map<String, Object> envelope = new HashMap<>();
             envelope.put("messageType", message.type());
             envelope.put("payload", message.payload());
@@ -105,31 +111,28 @@ public class RemoteDispatcher {
             envelope.put("senderPath", sender != null ? sender.path() : null);
             envelope.put("targetPath", targetPath);
 
-            log.info("📤 [{}] Sending {} to {} (routing: {})",
+            log.info("[{}] Sending message type={} to {} (routingKey={})",
                     serviceName, message.type(), targetPath, routingKey);
 
-            // 🔥 ICI LE CHANGEMENT IMPORTANT :
-            // on sérialise nous-mêmes avec objectMapper
+            // Sérialisation manuelle (on n'utilise pas convertAndSend)
             byte[] body = objectMapper.writeValueAsBytes(envelope);
 
-            org.springframework.amqp.core.Message amqpMsg =
-                    MessageBuilder.withBody(body)
-                            .setContentType(MessageProperties.CONTENT_TYPE_JSON)
-                            .build();
+            org.springframework.amqp.core.Message amqpMsg = MessageBuilder.withBody(body)
+                    .setContentType(MessageProperties.CONTENT_TYPE_JSON)
+                    .build();
 
-            // Et on utilise send() (PAS convertAndSend)
             rabbitTemplate.send(EXCHANGE_NAME, routingKey, amqpMsg);
 
-            log.debug("✅ Message sent successfully");
+            log.debug("Remote message sent (type={}, target={})", message.type(), targetPath);
 
         } catch (Exception e) {
-            log.error("❌ Failed to send remote message", e);
+            log.error("Failed to send remote message to {}", targetPath, e);
             throw new RuntimeException("Remote send failed", e);
         }
     }
 
     /**
-     * Start listening for incoming messages.
+     * Démarre l'écoute de la queue "<service>.messages" et redispatche vers le LocalDispatcher.
      */
     private void startListening() {
         try {
@@ -138,15 +141,13 @@ public class RemoteDispatcher {
             listenerContainer = new SimpleMessageListenerContainer(connectionFactory);
             listenerContainer.setQueueNames(queueName);
 
-            // ❌ LIGNE SUPPRIMÉE : pas de setMessageConverter ici
-            // listenerContainer.setMessageConverter(new Jackson2JsonMessageConverter());
-
+            // La conversion est gérée manuellement via objectMapper (pas de messageConverter)
             listenerContainer.setMessageListener(message -> {
                 try {
                     byte[] body = message.getBody();
                     String json = new String(body);
 
-                    log.debug("📨 [{}] Raw message received: {}", serviceName, json);
+                    log.debug("[{}] Raw message received: {}", serviceName, json);
 
                     @SuppressWarnings("unchecked")
                     Map<String, Object> envelope = objectMapper.readValue(json, Map.class);
@@ -157,41 +158,42 @@ public class RemoteDispatcher {
                     String senderPath = (String) envelope.get("senderPath");
                     String targetPath = (String) envelope.get("targetPath");
 
-                    log.info("📥 [{}] Received {} for {}", serviceName, messageType, targetPath);
+                    log.info("[{}] Received message type={} for {}",
+                            serviceName, messageType, targetPath);
 
-                    // Reconstruct message
+                    // Reconstruction du message framework
                     Message msg = new Message(messageType, payload, correlationId, senderPath);
 
-                    // Reconstruct sender
-                    ActorRef sender = senderPath != null
+                    // Reconstruction du sender (référence distante)
+                    ActorRef sender = (senderPath != null)
                             ? new RemoteActorRef(senderPath, system)
                             : null;
 
-                    // Dispatch locally
-                    log.debug("🔄 Routing to local actor: {}", targetPath);
+                    // Dispatch local vers l'acteur ciblé
                     localDispatcher.dispatch(targetPath, msg, sender);
 
-                    log.debug("✅ Message delivered to local actor");
-
                 } catch (Exception e) {
-                    log.error("❌ Failed to process incoming message", e);
+                    log.error("Failed to process incoming message for service {}", serviceName, e);
                 }
             });
 
             listenerContainer.start();
 
-            log.info("👂 [{}] Listening on queue: {}", serviceName, queueName);
+            log.info("[{}] Listening on queue {}", serviceName, queueName);
 
         } catch (Exception e) {
-            log.error("❌ Failed to start listener", e);
+            log.error("Failed to start listener for service {}", serviceName, e);
             throw new RuntimeException("Failed to start listener", e);
         }
     }
 
+    /**
+     * Arrêt propre du listener RabbitMQ.
+     */
     public void shutdown() {
         if (listenerContainer != null && listenerContainer.isRunning()) {
             listenerContainer.stop();
-            log.info("🔴 Listener stopped for: {}", serviceName);
+            log.info("[{}] Listener stopped", serviceName);
         }
     }
 }

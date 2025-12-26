@@ -10,7 +10,6 @@ public class ActorsConfig {
 
     @Bean(destroyMethod = "close")
     public ActorSystem actorSystem(RabbitTemplate rabbitTemplate) {
-        // ⚠️ IMPORTANT : doit matcher RabbitActorConfig (djroom)
         return ActorSystem.create("djroom", rabbitTemplate);
     }
 }

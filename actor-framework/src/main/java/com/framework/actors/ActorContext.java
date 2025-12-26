@@ -1,42 +1,45 @@
 package com.framework.actors;
 
 /**
- * Context provided to actors for interacting with the actor system.
+ * Contexte fourni à un acteur pour interagir avec le système d’acteurs.
+ * Il permet d’envoyer des messages, de créer ou arrêter des acteurs,
+ * et d’accéder aux références utiles (self, sender, system).
  */
 public interface ActorContext {
 
     /**
-     * Send a message to another actor.
+     * Envoie un message à un autre acteur.
      */
     void tell(ActorRef to, Message message);
 
     /**
-     * Get reference to self.
+     * Retourne la référence de l’acteur courant.
      */
     ActorRef self();
 
     /**
-     * Get reference to the sender of the current message.
+     * Retourne la référence de l’expéditeur du message courant.
+     * Peut être null si le message a été envoyé sans sender.
      */
     ActorRef sender();
 
     /**
-     * Create a child actor.
+     * Crée un acteur enfant avec le nom donné.
      */
     ActorRef actorOf(Class<? extends Actor> actorClass, String name);
 
     /**
-     * Select an actor by path (local or remote).
+     * Sélectionne un acteur à partir de son path (local ou distant).
      */
     ActorRef actorSelection(String path);
 
     /**
-     * Stop an actor.
+     * Arrête l’acteur référencé.
      */
     void stop(ActorRef ref);
 
     /**
-     * Get the actor system.
+     * Retourne le système d’acteurs.
      */
     ActorSystem system();
 }
