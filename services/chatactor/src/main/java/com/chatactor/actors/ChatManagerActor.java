@@ -1,44 +1,61 @@
 package com.chatactor.actors;
 
-import com.framework.actors.*;
+import com.framework.actors.Actor;
+import com.framework.actors.ActorContext;
+import com.framework.actors.ActorRef;
+import com.framework.actors.Message;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.CompletableFuture;
 
+/**
+ * ChatManagerActor :
+ * - responsable de la création et de la fermeture des ChatActor
+ * - un ChatActor par room
+ */
 public class ChatManagerActor implements Actor {
 
     private static final Logger log = LoggerFactory.getLogger(ChatManagerActor.class);
+
     public ChatManagerActor() {
-        // pour compat si framework supporte no-arg
+        // Compatible avec une instanciation sans argument
     }
 
+    /**
+     * Constructeur requis par l'ActorSystem (signature attendue).
+     * Le paramètre name n'est pas utilisé ici.
+     */
     public ChatManagerActor(String name) {
-        // IMPORTANT: ton ActorSystem cherche ce constructeur
-        // (même si tu n’utilises pas 'name' ici)
     }
+
+    /**
+     * Log de démarrage pour vérifier que le manager est bien actif.
+     */
     @Override
     public void preStart(ActorContext ctx) {
-        log.info("🧠 ChatManagerActor started at {}", ctx.self().path());
+        log.info("ChatManagerActor started at {}", ctx.self().path());
     }
 
+    /**
+     * Gère la création et la fermeture des ChatActor.
+     */
     @Override
     public CompletableFuture<Void> onReceive(Message message, ActorContext ctx) {
 
         switch (message.type()) {
 
             case "CREATE_CHAT" -> {
-                String roomId = (String) message.payload();  // room-7c9bf514
-                String actorName = "chat-" + roomId;         // => chat-room-7c9bf514 ✅
-                ctx.system().actorOf(ChatActor.class, actorName);
+                String roomId = (String) message.payload();
+                String actorName = "chat-" + roomId;
 
                 try {
-                    // ✅ UTILISE TON API OFFICIELLE
+                    // Création du ChatActor pour la room
                     ActorRef chat = ctx.system().actorOf(ChatActor.class, actorName);
-                    log.info("✅ ChatActor created for room {} -> {}", roomId, chat.path());
+                    log.info("ChatActor created for room {} at {}", roomId, chat.path());
                 } catch (Exception e) {
-                    // idempotent : déjà créé
-                    log.info("ℹ️ ChatActor already exists for room {}", roomId);
+                    // Création idempotente : l'acteur existe déjà
+                    log.info("ChatActor already exists for room {}", roomId);
                 }
             }
 
@@ -49,13 +66,14 @@ public class ChatManagerActor implements Actor {
                 try {
                     ActorRef chat = ctx.actorSelection(path);
                     ctx.tell(chat, Message.of("CLOSE_CHAT", null));
-                    log.info("🔒 CLOSE_CHAT forwarded to {}", path);
+                    log.info("CLOSE_CHAT forwarded to {}", path);
                 } catch (Exception e) {
-                    log.info("ℹ️ No chat actor to close for room {}", roomId);
+                    // Cas non bloquant : aucun chat actif pour cette room
+                    log.info("No ChatActor to close for room {}", roomId);
                 }
             }
 
-            default -> log.warn("Unknown message type: {}", message.type());
+            default -> log.warn("Unknown message type for ChatManagerActor: {}", message.type());
         }
 
         return CompletableFuture.completedFuture(null);

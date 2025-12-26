@@ -1,22 +1,28 @@
 package com.framework.actors;
 
 /**
- * Reference to an actor (local or remote).
+ * Référence vers un acteur (local ou distant).
+ * Une ActorRef permet d’interagir avec un acteur
+ * sans exposer son implémentation interne.
  */
 public interface ActorRef {
 
     /**
-     * Get the full path of this actor.
+     * Retourne le chemin complet (path) de l’acteur.
+     * Exemple : "djroom/playlist-room-xxxx".
      */
     String path();
 
     /**
-     * Check if this is a local actor.
+     * Indique si l’acteur est local au système courant.
      */
     boolean isLocal();
 
     /**
-     * Send a message to this actor.
+     * Envoie un message à cet acteur.
+     *
+     * @param message message à envoyer
+     * @param sender  référence de l’acteur expéditeur (peut être null)
      */
     void tell(Message message, ActorRef sender);
 }

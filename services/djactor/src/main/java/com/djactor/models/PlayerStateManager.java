@@ -4,18 +4,24 @@ import java.time.Instant;
 import java.util.Optional;
 
 /**
- * Represents the state of a media player and contains data about the current
- * song being played. also manages skip/prev/pause actions
- * knows the playlist it's currently playing
+ * Gère l'état d'un player :
+ * - statut (STOPPED / PLAYING / PAUSED)
+ * - track courant + position
+ * - interactions next/prev/pause
+ * - playlist associée (logique interne)
  */
 public class PlayerStateManager {
-    private PlayerStatus status; // status of the player - enum
+
+    private PlayerStatus status;
     private Track currentTrack;
-    private long positionMs; // current position in milliseconds in the current song- synced with front
+    private long positionMs;
+
+    // Logique de playlist interne (utilisée pour déterminer le next track)
     private final PlaylistActorLogic playlist;
 
-    // constructor that sets the state manager to a default status and default
-    // playlist
+    /**
+     * Initialise avec une playlist vide et un état idle.
+     */
     public PlayerStateManager() {
         this.playlist = new PlaylistActorLogic();
         setIdle();
@@ -27,23 +33,23 @@ public class PlayerStateManager {
     }
 
     /**
-     * performs actions to move to the next song in the playlist
+     * Passe au morceau suivant :
+     * - si un next existe, il devient le track courant
+     * - sinon, le player repasse en idle
      */
     public synchronized void nextSong() {
         Optional<Track> nextTrack = playlist.onNextTrack(new PlaylistActorLogic.NextTrack(true));
 
         if (nextTrack.isPresent()) {
-            Track track = nextTrack.get();
-            startNewSong(track);
+            startNewSong(nextTrack.get());
         } else {
             setIdle();
         }
-        return;
     }
 
     /**
-     * performs actions to move to the beginning of the current song by clicking the
-     * prev button
+     * Revenir au début du morceau courant (comportement "prev").
+     * Si aucun morceau courant, ne fait rien.
      */
     public synchronized void beginningOfSong() {
         if (this.getCurrentTrack().equals(Track.EMPTY_TRACK)) {
@@ -53,13 +59,14 @@ public class PlayerStateManager {
     }
 
     /**
-     * Toggles between PLAYING and PAUSED states
-     * if STOPPED, does nothing
+     * Bascule entre PLAYING et PAUSED.
+     * Si aucun morceau courant, ne fait rien.
      */
     public synchronized PlayerStatus togglePlayPause() {
         if (this.getCurrentTrack().equals(Track.EMPTY_TRACK)) {
             return this.status;
         }
+
         if (this.status == PlayerStatus.PLAYING) {
             this.status = PlayerStatus.PAUSED;
         } else {
@@ -69,9 +76,8 @@ public class PlayerStateManager {
     }
 
     /**
-     * Starts playing a new song from the beginning
-     *
-     * @throws IllegalArgumentException if trackID is zero
+     * Démarre un nouveau morceau depuis 0ms.
+     * Le statut passe automatiquement à PLAYING.
      */
     public synchronized void startNewSong(Track track) {
         if (track.equals(Track.EMPTY_TRACK)) {
@@ -83,22 +89,27 @@ public class PlayerStateManager {
     }
 
     /**
-     * increments the position by 250ms
-     * called by a scheduler every 250ms when playing
+     * Incrémente la position de lecture.
+     * Appelé typiquement par un scheduler (ex: toutes les 250ms).
+     * Si la durée est dépassée, déclenche automatiquement nextSong().
      */
     public void incrementPosition() {
         if (this.status == PlayerStatus.PLAYING && !this.currentTrack.equals(Track.EMPTY_TRACK)) {
             this.positionMs += 250;
 
-            Track currentTrack = getCurrentTrack();
-            if (currentTrack != null && positionMs >= currentTrack.getDurationMs()) {
+            Track track = getCurrentTrack();
+            if (track != null && positionMs >= track.getDurationMs()) {
                 nextSong();
             }
         }
     }
 
     /**
-     * sets the player to idle (default) state
+     * Remet le player à l'état idle :
+     * - playlist vidée
+     * - statut STOPPED
+     * - pas de track courant
+     * - position à 0
      */
     public void setIdle() {
         playlist.clearTracks();
@@ -108,19 +119,22 @@ public class PlayerStateManager {
     }
 
     /**
-     * add a new song to the playlist
+     * Ajoute un morceau à la playlist interne.
+     * Si la playlist était vide et qu'aucun track n'est en cours, déclenche nextSong()
+     * pour démarrer automatiquement la lecture.
      */
     public void addSongToPlaylist(long id, String title, String url, int score, long durationMs, Instant addedAt) {
         boolean wasEmpty = playlist.getState().isEmpty();
+
         Track track = new Track(id, title, url, score, durationMs, addedAt);
         playlist.onAddTrack(new PlaylistActorLogic.AddTrack(track));
 
         if (wasEmpty && this.currentTrack.equals(Track.EMPTY_TRACK)) {
-            nextSong(); // start playing the new song if the playlist was empty and the current song too
+            nextSong();
         }
     }
 
-    // getters/setters
+    // Getters / Setters
 
     public PlayerStatus getStatus() {
         return status;
@@ -135,7 +149,8 @@ public class PlayerStateManager {
     }
 
     /**
-     * @throws IllegalArgumentException if currentTrackId is negative
+     * Sécurise l'assignation du track courant.
+     * Refuse les ids négatifs (l'id 0 est géré via Track.EMPTY_TRACK).
      */
     public void setCurrentTrack(Track currentTrack) {
         if (currentTrack.getId() < 0) {
@@ -153,13 +168,10 @@ public class PlayerStateManager {
     }
 
     /**
-     * sets the position in milliseconds, zero if negative
+     * Définit la position.
+     * Si valeur négative, force à 0.
      */
     public void setPositionMs(long positionMs) {
-        if (positionMs < 0) {
-            this.positionMs = 0;
-        } else {
-            this.positionMs = positionMs;
-        }
+        this.positionMs = Math.max(0, positionMs);
     }
 }
