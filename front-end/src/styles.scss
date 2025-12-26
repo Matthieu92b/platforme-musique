@@ -1,0 +1,282 @@
+/* =========================
+   THEME: Noir / Blanc / Rouge
+   Angular Material (MDC)
+   ========================= */
+
+/* ---- Variables globales ---- */
+:root {
+  /* Backgrounds */
+  --bg: #0b0d10;          /* noir profond */
+  --bg-2: #11151b;        /* noir légèrement plus clair */
+  --surface: #0f1318;     /* surfaces sombres */
+  --card: #ffffff;        /* cartes blanches */
+
+  /* Text */
+  --text: #f5f7fa;        /* texte sur fond sombre */
+  --text-muted: #c7ced8;  /* texte secondaire sur fond sombre */
+  --text-dark: #0b0d10;   /* texte sur blanc */
+  --text-dark-muted: #2c3440;
+
+  /* Accent (rouge) */
+  --accent: #e11d48;      /* rouge framboise */
+  --accent-2: #ff2d55;    /* rouge plus “pop” */
+  --accent-hover: #be123c;
+
+  /* Borders / rings */
+  --border-dark: rgba(255, 255, 255, 0.12);
+  --border-light: rgba(11, 13, 16, 0.12);
+  --ring: rgba(225, 29, 72, 0.35);
+
+  /* Radius & shadow */
+  --radius: 18px;
+  --shadow: 0 12px 34px rgba(0, 0, 0, 0.45);
+}
+
+/* ---- Page globale ---- */
+html, body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  background:
+    radial-gradient(900px circle at 20% 10%, rgba(225, 29, 72, 0.12), transparent 55%),
+    radial-gradient(700px circle at 80% 30%, rgba(255, 45, 85, 0.10), transparent 55%),
+    linear-gradient(180deg, var(--bg-2), var(--bg));
+  font-family: Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Optionnel : liens */
+a { color: var(--accent-2); text-decoration: none; }
+a:hover { color: var(--accent); text-decoration: underline; }
+
+/* ---- Layout helpers (si besoin) ---- */
+.container {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+/* =========================
+   Angular Material: Cards
+   ========================= */
+.mat-mdc-card {
+  background: var(--card) !important;
+  color: var(--text-dark) !important;
+  border-radius: var(--radius) !important;
+  box-shadow: var(--shadow) !important;
+  border: 1px solid var(--border-light);
+}
+
+.mat-mdc-card .mat-mdc-card-title,
+.mat-mdc-card .mat-mdc-card-subtitle {
+  color: var(--text-dark) !important;
+}
+
+.mat-mdc-card .mat-mdc-card-subtitle {
+  color: var(--text-dark-muted) !important;
+}
+
+/* Séparateurs éventuels */
+hr, .mat-divider {
+  border-color: var(--border-light) !important;
+}
+
+/* =========================
+   Angular Material: Typography
+   ========================= */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--text);
+  margin: 0 0 12px 0;
+  letter-spacing: 0.2px;
+}
+
+.mat-mdc-card h1, .mat-mdc-card h2, .mat-mdc-card h3,
+.mat-mdc-card h4, .mat-mdc-card h5, .mat-mdc-card h6 {
+  color: var(--text-dark) !important;
+}
+
+/* =========================
+   Angular Material: Buttons
+   ========================= */
+
+/* Bouton principal (rouge) */
+.mat-mdc-raised-button,
+.mat-mdc-unelevated-button {
+  border-radius: 999px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.2px;
+}
+
+.mat-mdc-raised-button.mat-primary,
+.mat-mdc-unelevated-button.mat-primary {
+  background: linear-gradient(135deg, var(--accent-2), var(--accent)) !important;
+  color: #fff !important;
+  box-shadow: 0 10px 22px rgba(225, 29, 72, 0.28);
+}
+
+.mat-mdc-raised-button.mat-primary:hover,
+.mat-mdc-unelevated-button.mat-primary:hover {
+  filter: brightness(0.95);
+}
+
+/* Bouton secondaire (blanc contour rouge) */
+.mat-mdc-outlined-button {
+  border-radius: 999px !important;
+  border: 1.5px solid var(--accent) !important;
+  color: var(--accent) !important;
+  background: transparent !important;
+}
+
+.mat-mdc-outlined-button:hover {
+  background: rgba(225, 29, 72, 0.08) !important;
+}
+
+/* Bouton texte */
+.mat-mdc-button {
+  border-radius: 999px !important;
+  color: var(--accent-2) !important;
+}
+.mat-mdc-button:hover {
+  background: rgba(225, 29, 72, 0.08) !important;
+}
+
+/* Disabled */
+.mat-mdc-button[disabled],
+.mat-mdc-raised-button[disabled],
+.mat-mdc-unelevated-button[disabled],
+.mat-mdc-outlined-button[disabled] {
+  opacity: 0.5 !important;
+  filter: grayscale(0.2);
+}
+
+/* =========================
+   Angular Material: Inputs
+   ========================= */
+
+/* Label / hint */
+.mat-mdc-form-field .mdc-floating-label {
+  color: rgba(11, 13, 16, 0.65) !important; /* dans card blanc */
+}
+
+/* Texte input */
+.mat-mdc-form-field .mdc-text-field__input {
+  color: var(--text-dark) !important;
+}
+
+
+
+
+
+/* Erreur */
+.mat-mdc-form-field.mat-form-field-invalid .mdc-notched-outline__leading,
+.mat-mdc-form-field.mat-form-field-invalid .mdc-notched-outline__notch,
+.mat-mdc-form-field.mat-form-field-invalid .mdc-notched-outline__trailing {
+  border-color: #dc2626 !important;
+}
+
+/* =========================
+   Angular Material: Snackbars / Dialogs / Menus
+   ========================= */
+.mat-mdc-dialog-container .mdc-dialog__surface {
+  border-radius: var(--radius) !important;
+  background: var(--card) !important;
+  color: var(--text-dark) !important;
+  box-shadow: var(--shadow) !important;
+}
+
+.mat-mdc-menu-panel {
+  border-radius: 14px !important;
+  background: var(--surface) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border-dark);
+}
+
+.mat-mdc-menu-item { color: var(--text) !important; }
+.mat-mdc-menu-item:hover { background: rgba(255, 255, 255, 0.06) !important; }
+
+/* =========================
+   Angular Material: Tabs / Toolbar (si tu en as)
+   ========================= */
+.mat-toolbar {
+  background: transparent !important;
+  color: var(--text) !important;
+  border-bottom: 1px solid var(--border-dark);
+}
+
+.mat-mdc-tab-group, .mat-mdc-tab-nav-bar {
+  --mdc-tab-indicator-active-indicator-color: var(--accent) !important;
+}
+
+.mat-mdc-tab .mdc-tab__text-label {
+  color: var(--text-muted) !important;
+}
+.mat-mdc-tab.mdc-tab--active .mdc-tab__text-label {
+  color: var(--text) !important;
+}
+
+/* =========================
+   Bonus: style “hero card” (optionnel)
+   Ajoute class="hero-card" sur ton mat-card
+   ========================= */
+.hero-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-card::before {
+  content: "";
+  position: absolute;
+  inset: -120px -120px auto auto;
+  width: 260px;
+  height: 260px;
+  background: radial-gradient(circle, rgba(225, 29, 72, 0.25), transparent 60%);
+  transform: rotate(18deg);
+  pointer-events: none;
+}
+
+.hero-card::after {
+  content: "";
+  position: absolute;
+  inset: auto auto -140px -140px;
+  width: 320px;
+  height: 320px;
+  background: radial-gradient(circle, rgba(255, 45, 85, 0.18), transparent 60%);
+  pointer-events: none;
+}
+
+audio {
+  display: none;}
+
+
+.mat-mdc-card {
+  padding: 20px;
+}
+.bar-audio {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+.mat-mdc-progress-bar {
+  width: 80% !important;
+}
+.btn-audio {
+display: flex !important;
+  justify-content: center;
+  gap: 5px;
+}
+.mdc-linear-progress__buffer {
+  height:10px;
+}
+.room-shell {
+  display: flex;
+  justify-content: center;
+  gap:10%;
+}
+.room-chat {
+  width: 40%;
+}
+.room-audio {
+  width: 60%;
+}

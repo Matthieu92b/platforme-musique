@@ -1,0 +1,98 @@
+<!-- src/app/pages/room/room.component.html -->
+<div class="room-shell" style=" margin: 24px auto;">
+  <mat-card>
+    <mat-card-title>Room {{ roomId }}</mat-card-title>
+    <mat-card-subtitle>Connecté en tant que {{ userId }}</mat-card-subtitle>
+
+    <mat-card-content>
+
+
+
+      <!-- Audio HTML5 (source pilotée par playerState.currentUrl) -->
+      <audio
+        #audioPlayer
+        controls
+      >
+
+        Votre navigateur ne supporte pas l'audio HTML5.
+      </audio>
+      <div class="bar-audio">
+        <mat-progress-bar
+          mode="determinate"
+          [value]="getProgressPercent()"
+        ></mat-progress-bar>
+        <div *ngIf="playerState">
+          {{ formatTime(displayPositionMs) }} / {{ formatTime(displayDurationMs) }}
+        </div>
+      </div>
+
+      <div class="btn-audio" style="margin-top: 16px;">
+        <button mat-raised-button color="primary" (click)="play()">Play</button>
+        <button  mat-raised-button color="primary"  (click)="pause()">Pause</button>
+        <button
+          mat-stroked-button
+          color="primary"
+          (click)="next()"
+          [disabled]="!canGoNext()"
+        >
+          Next
+        </button>
+      </div>
+
+      <mat-divider style="margin: 20px 0;"></mat-divider>
+
+      <!-- Ajout de track -->
+      <h3>Ajouter un morceau</h3>
+      <form (ngSubmit)="addTrack()">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Titre</mat-label>
+          <input matInput [(ngModel)]="trackTitle" name="trackTitle" required />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>URL</mat-label>
+          <input matInput [(ngModel)]="trackUrl" name="trackUrl" required />
+        </mat-form-field>
+        <button mat-raised-button color="primary" type="submit" [disabled]="isAdding">
+          Ajouter
+        </button>
+
+        <span *ngIf="error" style="color: #d32f2f; margin-left: 12px;">
+          {{ error }}
+        </span>
+      </form>
+
+      <mat-divider style="margin: 20px 0;"></mat-divider>
+
+      <!-- Playlist -->
+      <div class="playlist-container">
+        <h3>Playlist</h3>
+
+        <div *ngIf="playlist?.length; else emptyPlaylist">
+          <div class="playlist-item" *ngFor="let track of playlist">
+            <div class="playlist-main">
+              <div class="playlist-title">{{ track.title }}</div>
+              <div class="playlist-meta">
+                <span> · </span>
+                <span>Durée : {{ formatTime(displayDurationMs) }}</span>
+                <span *ngIf="track.addedBy"> · Ajouté par {{ track.addedBy }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <ng-template #emptyPlaylist>
+          <p *ngIf="!isLoadingPlaylist">Pas encore de morceaux dans la playlist.</p>
+          <p *ngIf="isLoadingPlaylist">Chargement…</p>
+        </ng-template>
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+
+  <aside class="room-chat">
+    <app-chat [roomId]="roomId" [userId]="userId"></app-chat>
+
+
+  </aside>
+</div>
