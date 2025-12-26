@@ -1,0 +1,41 @@
+
+<div class="home-container" style="max-width: 600px; margin: 32px auto;">
+  <mat-card>
+    <mat-card-title>Welcome sur ta plateforme DJ 🎧</mat-card-title>
+    <mat-card-content>
+
+      <form (ngSubmit)="createRoom()">
+        <mat-form-field  class="w-100">
+          <mat-label>User ID</mat-label>
+          <input matInput [(ngModel)]="userId" name="userId" required />
+        </mat-form-field>
+
+        <mat-form-field  class="w-100">
+          <mat-label>Nom de la room</mat-label>
+          <input matInput [(ngModel)]="roomName" name="roomName" />
+        </mat-form-field>
+
+        <button mat-raised-button color="primary" type="submit" [disabled]="isLoadingCreate">
+          Créer une room
+        </button>
+      </form>
+
+      <mat-divider class="my-4"></mat-divider>
+
+      <form (ngSubmit)="joinRoom()">
+        <mat-form-field  class="w-100">
+          <mat-label>Room ID</mat-label>
+          <input matInput [(ngModel)]="joinRoomId" name="joinRoomId" />
+        </mat-form-field>
+
+        <button mat-stroked-button color="accent" type="submit" [disabled]="isLoadingJoin">
+          Rejoindre une room
+        </button>
+      </form>
+
+      <div *ngIf="error" style="color: #d32f2f; margin-top: 8px;">
+        {{ error }}
+      </div>
+    </mat-card-content>
+  </mat-card>
+</div>
